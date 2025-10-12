@@ -1,44 +1,64 @@
-version: "3"
+version: "3.9"
+
 networks:
   application:
     driver: bridge
+
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mybackend
+    container_name: rentallgram-backend
+    restart: unless-stopped
     ports:
-      - 8000:8000
+      - "8000:8000"
     volumes:
       - ./backend:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
-      - DB_HOST=pgdb
+      APP_ENV: local
+      APP_DEBUG: true
+      APP_KEY: base64:SomeRandomKeyHere==
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: test-db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
     networks:
       - application
-    entrypoint: ['/bin/sh', '-c']
-    command:
-      - |
-        composer install
-        php artisan migrate
+    command: >
+      sh -c "
+        echo '⏳ Waiting for database...';
+        until pg_isready -h db -U postgres > /dev/null 2>&1; do sleep 2; done;
+        echo '✅ Database is ready!';
+        composer install --no-interaction;
+        php artisan key:generate || true;
+        php artisan migrate --force;
+        php artisan db:seed --force;
+        echo '🚀 Starting Laravel server...';
         php artisan serve --host=0.0.0.0 --port=8000
+      "
+
   db:
     image: postgres:15
+    container_name: rentallgram-db
+    restart: unless-stopped
     ports:
       - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test-db
     volumes:
       - ./data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=test-db
-    networks:
-      - application
-    container_name: mypgdb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    networks:
+      - application
