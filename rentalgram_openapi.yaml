@@ -1,0 +1,664 @@
+openapi: 3.0.3
+info:
+  title: RentalGram API
+  description: API for RentalGram backend — properties listing, bookings, users, auth, and file uploads.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.rentalgram.example.com
+    description: Production server (example)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+      example:
+        message: "Not Found"
+        code: 404
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [user, host, admin]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, email, role, createdAt]
+      example:
+        id: "b3e1f1f2-2b4a-4c5d-9a1b-1234567890ab"
+        name: "Ali Reza"
+        email: "ali@example.com"
+        phone: "+989123456789"
+        role: "host"
+        createdAt: "2025-10-27T12:00:00Z"
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+        refreshToken:
+          type: string
+      example:
+        accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        tokenType: "Bearer"
+        expiresIn: 3600
+        refreshToken: "def50200a1b2c3..."
+    Location:
+      type: object
+      properties:
+        city:
+          type: string
+        address:
+          type: string
+        lat:
+          type: number
+          format: float
+        lon:
+          type: number
+          format: float
+      example:
+        city: "Bandar Anzali"
+        address: "No.12, Marine St."
+        lat: 37.4743
+        lon: 49.4491
+    Property:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        pricePerNight:
+          type: number
+          format: float
+        currency:
+          type: string
+          example: "IRR"
+        hostId:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+        amenities:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+            format: uri
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, pricePerNight, hostId, location]
+      example:
+        id: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
+        title: "آپارتمان ساحلی در بندر انزلی"
+        description: "آپارتمان 2 خوابه با چشم‌انداز دریا، نزدیک ساحل و امکانات کامل."
+        pricePerNight: 650000
+        currency: "IRR"
+        hostId: "b3e1f1f2-2b4a-4c5d-9a1b-1234567890ab"
+        location:
+          city: "Bandar Anzali"
+          address: "خیابان ساحلی، پلاک 5"
+          lat: 37.4743
+          lon: 49.4491
+        amenities: ["wifi", "parking", "air_conditioner"]
+        images: ["https://cdn.rentalgram.example.com/images/prop1/1.jpg"]
+        createdAt: "2025-10-01T08:30:00Z"
+    CreatePropertyRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        pricePerNight:
+          type: number
+        currency:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+        amenities:
+          type: array
+          items:
+            type: string
+      required: [title, pricePerNight, location]
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        propertyId:
+          type: string
+        userId:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        totalPrice:
+          type: number
+          format: float
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, propertyId, userId, startDate, endDate, totalPrice]
+      example:
+        id: "d4c3b2a1-9876-5432-1a2b-1234567890ab"
+        propertyId: "a1b2c3d4-5678-90ab-cdef-1234567890ab"
+        userId: "u1u2u3u4-5566-7788-99aa-bbccddeeff00"
+        startDate: "2025-11-01"
+        endDate: "2025-11-05"
+        totalPrice: 2600000
+        status: "pending"
+        createdAt: "2025-10-10T09:00:00Z"
+    CreateBookingRequest:
+      type: object
+      properties:
+        propertyId:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        guests:
+          type: integer
+      required: [propertyId, startDate, endDate]
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns service health.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                example:
+                  status: "ok"
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                phone:
+                  type: string
+              required: [name, email, password]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/login:
+    post:
+      summary: Login and receive JWT tokens
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required: [email, password]
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/refresh:
+    post:
+      summary: Refresh access token using refresh token
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /users/{userId}:
+    get:
+      summary: Get user profile
+      tags: [users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /properties:
+    get:
+      summary: List properties with filters
+      tags: [properties]
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: perPage
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated property list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  perPage:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Property'
+    post:
+      summary: Create a new property (host only)
+      tags: [properties]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePropertyRequest'
+      responses:
+        '201':
+          description: Created property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '401':
+          description: Unauthorized
+  /properties/{propertyId}:
+    get:
+      summary: Get property by id
+      tags: [properties]
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '404':
+          description: Not found
+    put:
+      summary: Update a property (host only)
+      tags: [properties]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePropertyRequest'
+      responses:
+        '200':
+          description: Updated property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+    delete:
+      summary: Delete property (host only)
+      tags: [properties]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+  /properties/{propertyId}/images:
+    post:
+      summary: Upload an image for a property
+      tags: [properties]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                example:
+                  url: "https://cdn.rentalgram.example.com/images/prop1/2.jpg"
+  /bookings:
+    get:
+      summary: List bookings for current user (or admin can list all with query)
+      tags: [bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Booking list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+    post:
+      summary: Create a booking for a property
+      tags: [bookings]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          description: Validation error or date unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /bookings/{bookingId}:
+    get:
+      summary: Get booking by id (owner or admin)
+      tags: [bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Not found
+    put:
+      summary: Update booking status (cancel/confirm)
+      tags: [bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, confirmed, cancelled, completed]
+      responses:
+        '200':
+          description: Booking updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+  /payments/create:
+    post:
+      summary: Create a payment intent / start payment flow
+      tags: [payments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bookingId:
+                  type: string
+                amount:
+                  type: number
+              required: [bookingId, amount]
+      responses:
+        '200':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paymentUrl:
+                    type: string
+                  paymentId:
+                    type: string
+                example:
+                  paymentUrl: "https://pay.example.com/checkout/abc123"
+                  paymentId: "pay_abc123"
+  /admin/stats:
+    get:
+      summary: Get admin dashboard stats
+      tags: [admin]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usersCount:
+                    type: integer
+                  propertiesCount:
+                    type: integer
+                  bookingsToday:
+                    type: integer
+                example:
+                  usersCount: 1200
+                  propertiesCount: 350
+                  bookingsToday: 7
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+    description: Authentication and authorization
+  - name: users
+    description: User profiles and management
+  - name: properties
+    description: Property listings and media uploads
+  - name: bookings
+    description: Bookings management
+  - name: payments
+    description: Payment flows
+  - name: admin
+    description: Admin endpoints
