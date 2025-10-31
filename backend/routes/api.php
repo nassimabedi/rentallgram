@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\ItemController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,3 +31,20 @@ Route::middleware('auth:sanctum')->get('/user', function(Request $request) {
 
 Route::middleware(['auth:sanctum', 'admin'])->post('/categories', [CategoryController::class, 'store']);
 Route::get('/categories', [CategoryController::class, 'index']);
+Route::middleware(['auth:sanctum', 'owner'])->group(function () {
+    Route::post('/items', [ItemController::class, 'store']);
+});
+
+Route::middleware(['auth:sanctum', 'owner'])->group(function () {
+    Route::put('/items/{id}', [ItemController::class, 'update']);
+});
+
+Route::middleware(['auth:sanctum', 'owner'])->group(function () {
+    Route::delete('/items/{id}', [ItemController::class, 'destroy']);
+});
+
+// Public endpoint (no owner restriction)
+Route::get('/items/{id}', [ItemController::class, 'show']);
+
+// Public endpoint (no owner restriction)
+Route::get('/items', [ItemController::class, 'index']);
